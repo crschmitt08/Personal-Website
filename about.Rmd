@@ -4,6 +4,8 @@ title: "Project List"
 
 [Loan Default Prediction Model](https://github.com/crschmitt08/Loan-Default-Analysis)
 
+[Get Latitude and Longitude using OpenStreetMap API](GetLatandLon.html)
+
 DataCamp project - Gender Bias in Graduate Admissions
 
 DataCamp project - Predict Taxi Fares with Random Forests
