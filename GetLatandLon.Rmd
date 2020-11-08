@@ -1,0 +1,66 @@
+---
+title: "<center> Get Latitude and Longitude using <br> OpenStreetMap API </center>"
+output: html_document
+---
+
+Suppose you want to create a heat map of your customers to determine where you will build or purchase a new store location. Programs such R and Python have libraries to create maps, but require latitude and longitude data to properly plot a location. Not all businesses store customer information containing this data, so you will need to retrieve it.
+
+There are a number of API's you can use to access this information (Google, Mapquest, Texas A&M to name a few), but those require an API key and limit the number of requests in their free tier.  [OpenStreetMap](https://www.openstreetmap.org/#map=3/71.34/-96.82), or OSM, is completely free and simple to use. It's primary downfall is speed. You are limited to one address per second according to the API [documention](https://operations.osmfoundation.org/policies/nominatim/). However, if you are willing to wait or have a small number of addresses, then OSM may be the best option.
+
+Suppose we want to get the location of the home of my place of employment Alltru Federal Credit, we can simply use the following call:
+
+*https://nominatim.openstreetmap.org/search?q=1232+wentzville+parkway,+MO,+63385,+usa&format=json&addressdetails=0&limit=1*
+
+This will return a webpage with this JSON format:
+```
+[{"place_id":66759951,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright","osm_type":"node","osm_id":5628788593,"boundingbox":["38.824421","38.824521","-90.8659085","-90.8658085"],"lat":"38.824471","lon":"-90.8658585","display_name":"1232, Wentzville Parkway, Wentzville, Saint Charles County, Missouri, 63385, United States of America","class":"place","type":"house","importance":0.42099999999999993}]
+```
+
+Embedded in the returned data are the values for lat and lon. I have modified a short script written by [Michael Hainke](https://github.com/michael-hainke/GeoCoding) that loops through a data frame of addresses and extract the neccesary data from the resulting JSON file. My modification allows you to add street address, state, zipcode, and country to the API GET request. The first step is to call the libraries needed and define a function to extract the data using the API
+
+```{r eval=FALSE}
+library(tidyverse)
+library(jsonlite) 
+
+
+nominatim_osm <- function(address = NULL, state = NULL, zipcode = NULL, country = NULL)
+{
+  if(suppressWarnings(is.null(address)))
+    return(data.frame())
+  tryCatch(
+    d <- jsonlite::fromJSON( 
+      gsub('\\@addr\\@', gsub('\\s+', '\\%20', paste(address, state, zipcode, country, sep = ",")), 
+           'https://nominatim.openstreetmap.org/search/@addr@?format=json&addressdetails=0&limit=1')
+    ), error = function(c) return(data.frame())
+  )
+  if(length(d) == 0) return(data.frame())
+  return(data.frame(lon = as.numeric(d$lon), lat = as.numeric(d$lat)))
+}
+```
+
+Next step, is to load the data containing the addresses you wish to retrieve latitude and longitude for.
+
+```{r eval=FALSE}
+addresses <- read.csv("testdata.csv", header = FALSE) %>%
+  mutate(lon = 0,
+         lat = 0)
+```
+
+Finally, we can loop through each address and retrieve the latitude and longitude using the function we created. To comply with guidelines there is a 1 second delay between each loop.
+
+```{r eval=FALSE}
+geo_coded_addresses <- c()
+
+for (i in 1:dim(addresses)[1]) {
+  long_lat <- nominatim_osm(addresses$address[i], addresses$state[i], addresses$zipcode[i], country = "USA")
+  Sys.sleep(1)
+  if (dim(long_lat)[1] != 0) {
+    addresses$lon[i] = long_lat$lon
+    addresses$lat[i] = long_lat$lat
+  }
+}
+```
+
+The final dataframe will replace the default zero in the latitude and longitude fields.
+
+**HAPPY GEOCODING**
